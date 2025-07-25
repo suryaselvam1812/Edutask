@@ -6,34 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-} from "recharts"
-import {
-  FileText,
-  Users,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  Download,
-  TrendingUp,
-  LogOut,
-  Shield,
-  GraduationCap,
-} from "lucide-react"
+import { TrendingUp, LogOut, Shield, Users, GraduationCap, FileText, Download, BarChart3, PieChart } from "lucide-react"
 import Link from "next/link"
-import { getTasks, getUsers, getFiles, type Task, type User, type UploadedFile } from "@/lib/storage"
+import { getTasks, getUsers, getUploadedFiles, type User, type Task, type UploadedFile } from "@/lib/storage"
 
 export default function ReportsPage() {
   const router = useRouter()
@@ -42,10 +17,11 @@ export default function ReportsPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [files, setFiles] = useState<UploadedFile[]>([])
-  const [timeFilter, setTimeFilter] = useState("all")
+  const [selectedPeriod, setSelectedPeriod] = useState("all")
+  const [selectedDepartment, setSelectedDepartment] = useState("all")
 
   useEffect(() => {
-    const userData = localStorage.getItem("edutask_user")
+    const userData = localStorage.getItem("iqac_user")
     if (!userData) {
       router.push("/login")
       return
@@ -59,7 +35,7 @@ export default function ReportsPage() {
 
   const loadData = async () => {
     try {
-      const [tasksData, usersData, filesData] = await Promise.all([getTasks(), getUsers(), getFiles()])
+      const [tasksData, usersData, filesData] = await Promise.all([getTasks(), getUsers(), getUploadedFiles()])
       setTasks(tasksData || [])
       setUsers(usersData || [])
       setFiles(filesData || [])
@@ -72,7 +48,7 @@ export default function ReportsPage() {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem("edutask_user")
+    localStorage.removeItem("iqac_user")
     router.push("/login")
   }
 
@@ -102,77 +78,43 @@ export default function ReportsPage() {
     }
   }
 
-  // Filter tasks based on time period
-  const getFilteredTasks = () => {
-    if (timeFilter === "all") return tasks
-
-    const now = new Date()
-    const filterDate = new Date()
-
-    switch (timeFilter) {
-      case "week":
-        filterDate.setDate(now.getDate() - 7)
-        break
-      case "month":
-        filterDate.setMonth(now.getMonth() - 1)
-        break
-      case "quarter":
-        filterDate.setMonth(now.getMonth() - 3)
-        break
-      default:
-        return tasks
-    }
-
-    return tasks.filter((task) => new Date(task.created_at) >= filterDate)
-  }
-
-  const filteredTasks = getFilteredTasks()
-
   // Calculate statistics
-  const totalTasks = filteredTasks.length
-  const completedTasks = filteredTasks.filter((task) => task.status === "completed").length
-  const inProgressTasks = filteredTasks.filter((task) => task.status === "in_progress").length
-  const pendingTasks = filteredTasks.filter((task) => task.status === "pending").length
-  const totalUsers = users.length
-  const activeUsers = users.filter((u) => u.role === "staff").length
+  const totalTasks = tasks.length
+  const completedTasks = tasks.filter((task) => task.status === "completed").length
+  const inProgressTasks = tasks.filter((task) => task.status === "in_progress").length
+  const pendingTasks = tasks.filter((task) => task.status === "pending").length
+  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+
   const totalFiles = files.length
+  const totalUsers = users.length
+  const staffUsers = users.filter((u) => u.role === "staff").length
 
-  // Status distribution data
-  const statusData = [
-    { name: "Completed", value: completedTasks, color: "#10B981" },
-    { name: "In Progress", value: inProgressTasks, color: "#3B82F6" },
-    { name: "Pending", value: pendingTasks, color: "#F59E0B" },
-  ]
-
-  // Priority distribution data
-  const priorityData = [
-    { name: "High", value: filteredTasks.filter((t) => t.priority === "high").length, color: "#EF4444" },
-    { name: "Medium", value: filteredTasks.filter((t) => t.priority === "medium").length, color: "#F59E0B" },
-    { name: "Low", value: filteredTasks.filter((t) => t.priority === "low").length, color: "#10B981" },
-  ]
-
-  // Department performance data
-  const departments = Array.from(new Set(filteredTasks.map((task) => task.department).filter(Boolean)))
-  const departmentData = departments.map((dept) => {
-    const deptTasks = filteredTasks.filter((task) => task.department === dept)
-    const completed = deptTasks.filter((task) => task.status === "completed").length
+  // Department statistics
+  const departments = Array.from(new Set(tasks.map((task) => task.department).filter(Boolean)))
+  const departmentStats = departments.map((dept) => {
+    const deptTasks = tasks.filter((task) => task.department === dept)
+    const deptCompleted = deptTasks.filter((task) => task.status === "completed").length
     return {
       name: dept,
       total: deptTasks.length,
-      completed,
-      completionRate: deptTasks.length > 0 ? Math.round((completed / deptTasks.length) * 100) : 0,
+      completed: deptCompleted,
+      rate: deptTasks.length > 0 ? Math.round((deptCompleted / deptTasks.length) * 100) : 0,
     }
   })
 
-  // Monthly task creation trend (mock data for demonstration)
-  const monthlyData = [
-    { month: "Jan", tasks: 12, completed: 8 },
-    { month: "Feb", tasks: 15, completed: 12 },
-    { month: "Mar", tasks: 18, completed: 14 },
-    { month: "Apr", tasks: 22, completed: 18 },
-    { month: "May", tasks: 25, completed: 20 },
-    { month: "Jun", tasks: 20, completed: 16 },
-  ]
+  // Priority distribution
+  const highPriority = tasks.filter((task) => task.priority === "high").length
+  const mediumPriority = tasks.filter((task) => task.priority === "medium").length
+  const lowPriority = tasks.filter((task) => task.priority === "low").length
+
+  // Recent activity
+  const recentTasks = tasks
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 5)
+
+  const recentFiles = files
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 5)
 
   if (loading) {
     return (
@@ -198,7 +140,7 @@ export default function ReportsPage() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <TrendingUp className="h-8 w-8 text-blue-600" />
-                <h1 className="text-xl font-bold text-gray-900">EduTask</h1>
+                <h1 className="text-xl font-bold text-gray-900">IQAC SmartTrack</h1>
               </div>
             </div>
 
@@ -255,27 +197,27 @@ export default function ReportsPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-6">
+          {/* Page Header */}
+          <div className="mb-8 flex justify-between items-center">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Reports & Analytics</h2>
-              <p className="text-gray-600">Comprehensive insights into task management and faculty performance</p>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Reports & Analytics</h2>
+              <p className="text-gray-600">Comprehensive overview of IQAC activities and performance metrics.</p>
             </div>
-            <div className="flex items-center space-x-4">
-              <Select value={timeFilter} onValueChange={setTimeFilter}>
+            <div className="flex space-x-4">
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Time Period" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Time</SelectItem>
-                  <SelectItem value="week">Last Week</SelectItem>
-                  <SelectItem value="month">Last Month</SelectItem>
-                  <SelectItem value="quarter">Last Quarter</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                  <SelectItem value="quarter">This Quarter</SelectItem>
+                  <SelectItem value="year">This Year</SelectItem>
                 </SelectContent>
               </Select>
               <Button variant="outline">
                 <Download className="h-4 w-4 mr-2" />
-                Export
+                Export Report
               </Button>
             </div>
           </div>
@@ -289,8 +231,19 @@ export default function ReportsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{totalTasks}</div>
+                <p className="text-xs text-muted-foreground">Across all departments</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
+                <TrendingUp className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{completionRate}%</div>
                 <p className="text-xs text-muted-foreground">
-                  {timeFilter === "all" ? "All time" : `Last ${timeFilter}`}
+                  {completedTasks} of {totalTasks} completed
                 </p>
               </CardContent>
             </Card>
@@ -298,217 +251,230 @@ export default function ReportsPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Active Faculty</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
+                <Users className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{activeUsers}</div>
+                <div className="text-2xl font-bold">{staffUsers}</div>
                 <p className="text-xs text-muted-foreground">Staff members</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
-                <CheckCircle className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}%
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {completedTasks} of {totalTasks} tasks
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Files Uploaded</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
+                <FileText className="h-4 w-4 text-purple-600" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{totalFiles}</div>
-                <p className="text-xs text-muted-foreground">Total documents</p>
+                <p className="text-xs text-muted-foreground">Documents & files</p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Charts Row 1 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             {/* Task Status Distribution */}
             <Card>
               <CardHeader>
-                <CardTitle>Task Status Distribution</CardTitle>
-                <CardDescription>Current status of all tasks</CardDescription>
+                <CardTitle className="flex items-center">
+                  <PieChart className="h-5 w-5 mr-2" />
+                  Task Status Distribution
+                </CardTitle>
+                <CardDescription>Current status of all tasks in the system</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={statusData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {statusData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span className="text-sm">Completed</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium">{completedTasks}</div>
+                      <div className="text-xs text-gray-500">{completionRate}%</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                      <span className="text-sm">In Progress</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium">{inProgressTasks}</div>
+                      <div className="text-xs text-gray-500">
+                        {totalTasks > 0 ? Math.round((inProgressTasks / totalTasks) * 100) : 0}%
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                      <span className="text-sm">Pending</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium">{pendingTasks}</div>
+                      <div className="text-xs text-gray-500">
+                        {totalTasks > 0 ? Math.round((pendingTasks / totalTasks) * 100) : 0}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
             {/* Priority Distribution */}
             <Card>
               <CardHeader>
-                <CardTitle>Priority Distribution</CardTitle>
-                <CardDescription>Tasks by priority level</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={priorityData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#8884d8">
-                      {priorityData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Charts Row 2 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {/* Department Performance */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Department Performance</CardTitle>
-                <CardDescription>Task completion rates by department</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={departmentData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="completionRate" fill="#3B82F6" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            {/* Monthly Trend */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Monthly Task Trend</CardTitle>
-                <CardDescription>Task creation and completion over time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="tasks" stroke="#8884d8" name="Created" />
-                    <Line type="monotone" dataKey="completed" stroke="#82ca9d" name="Completed" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Detailed Tables */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Top Performers */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Performers</CardTitle>
-                <CardDescription>Faculty with highest task completion rates</CardDescription>
+                <CardTitle className="flex items-center">
+                  <BarChart3 className="h-5 w-5 mr-2" />
+                  Priority Distribution
+                </CardTitle>
+                <CardDescription>Task distribution by priority level</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {users
-                    .filter((u) => u.role === "staff")
-                    .map((faculty) => {
-                      const facultyTasks = filteredTasks.filter((task) => task.assigned_to === faculty.id)
-                      const completed = facultyTasks.filter((task) => task.status === "completed").length
-                      const completionRate = facultyTasks.length > 0 ? (completed / facultyTasks.length) * 100 : 0
-                      return { ...faculty, completionRate, totalTasks: facultyTasks.length }
-                    })
-                    .sort((a, b) => b.completionRate - a.completionRate)
-                    .slice(0, 5)
-                    .map((faculty) => (
-                      <div key={faculty.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="font-medium text-gray-900">{faculty.name}</p>
-                          <p className="text-sm text-gray-500">{faculty.department}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-green-600">{Math.round(faculty.completionRate)}%</p>
-                          <p className="text-xs text-gray-500">{faculty.totalTasks} tasks</p>
-                        </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                      <span className="text-sm">High Priority</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium">{highPriority}</div>
+                      <div className="text-xs text-gray-500">
+                        {totalTasks > 0 ? Math.round((highPriority / totalTasks) * 100) : 0}%
                       </div>
-                    ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                      <span className="text-sm">Medium Priority</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium">{mediumPriority}</div>
+                      <div className="text-xs text-gray-500">
+                        {totalTasks > 0 ? Math.round((mediumPriority / totalTasks) * 100) : 0}%
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span className="text-sm">Low Priority</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium">{lowPriority}</div>
+                      <div className="text-xs text-gray-500">
+                        {totalTasks > 0 ? Math.round((lowPriority / totalTasks) * 100) : 0}%
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+          </div>
 
-            {/* Recent Activity */}
+          {/* Department Performance */}
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Department Performance</CardTitle>
+              <CardDescription>Task completion rates by department</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {departmentStats.length === 0 ? (
+                <div className="text-center py-8">
+                  <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500">No department data available</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {departmentStats.map((dept) => (
+                    <div key={dept.name} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium text-gray-900">{dept.name}</h4>
+                        <p className="text-sm text-gray-500">{dept.total} total tasks</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold">{dept.rate}%</div>
+                        <div className="text-sm text-gray-500">{dept.completed} completed</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Recent Tasks */}
             <Card>
               <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Latest task updates and completions</CardDescription>
+                <CardTitle>Recent Tasks</CardTitle>
+                <CardDescription>Latest task activities</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {filteredTasks
-                    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-                    .slice(0, 5)
-                    .map((task) => (
-                      <div key={task.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                        <div className="flex-shrink-0">
-                          {task.status === "completed" ? (
-                            <CheckCircle className="h-5 w-5 text-green-600" />
-                          ) : task.status === "in_progress" ? (
-                            <Clock className="h-5 w-5 text-blue-600" />
-                          ) : (
-                            <AlertCircle className="h-5 w-5 text-orange-600" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
-                          <p className="text-xs text-gray-500">
-                            {task.assigned_user?.name} • {new Date(task.updated_at).toLocaleDateString()}
+                {recentTasks.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">No recent tasks</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recentTasks.map((task) => (
+                      <div key={task.id} className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900 truncate">{task.title}</h4>
+                          <p className="text-sm text-gray-500">
+                            {task.assigned_user?.name || "Unassigned"} • {task.department}
                           </p>
                         </div>
-                        <Badge
-                          variant="outline"
-                          className={
-                            task.status === "completed"
-                              ? "bg-green-100 text-green-800"
-                              : task.status === "in_progress"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-orange-100 text-orange-800"
-                          }
-                        >
-                          {task.status.replace("_", " ")}
-                        </Badge>
+                        <div className="flex items-center space-x-2">
+                          <Badge
+                            className={
+                              task.status === "completed"
+                                ? "bg-green-100 text-green-800"
+                                : task.status === "in_progress"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-orange-100 text-orange-800"
+                            }
+                          >
+                            {task.status.replace("_", " ")}
+                          </Badge>
+                          <div className="text-xs text-gray-500">{new Date(task.created_at).toLocaleDateString()}</div>
+                        </div>
                       </div>
                     ))}
-                </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Recent Files */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent File Uploads</CardTitle>
+                <CardDescription>Latest document submissions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {recentFiles.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">No recent uploads</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recentFiles.map((file) => (
+                      <div key={file.id} className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900 truncate">{file.upload_title || file.file_name}</h4>
+                          <p className="text-sm text-gray-500">
+                            {file.uploaded_user?.name || "Unknown"} • {file.category || "Uncategorized"}
+                          </p>
+                        </div>
+                        <div className="text-xs text-gray-500">{new Date(file.created_at).toLocaleDateString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

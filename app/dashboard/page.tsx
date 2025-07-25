@@ -31,7 +31,7 @@ export default function Dashboard() {
   const [showNewTaskDialog, setShowNewTaskDialog] = useState(false)
 
   useEffect(() => {
-    const userData = localStorage.getItem("edutask_user")
+    const userData = localStorage.getItem("iqac_user")
     if (!userData) {
       router.push("/login")
       return
@@ -54,7 +54,7 @@ export default function Dashboard() {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem("edutask_user")
+    localStorage.removeItem("iqac_user")
     router.push("/login")
   }
 
@@ -107,13 +107,13 @@ export default function Dashboard() {
   const getWelcomeMessage = (role: string) => {
     switch (role) {
       case "iqac":
-        return "Welcome to EduTask - Quality Assurance Dashboard"
+        return "Welcome to IQAC SmartTrack - Quality Assurance Dashboard"
       case "hod":
-        return "Welcome to EduTask - Department Management Dashboard"
+        return "Welcome to IQAC SmartTrack - Department Management Dashboard"
       case "staff":
-        return "Welcome to EduTask - Your Task Dashboard"
+        return "Welcome to IQAC SmartTrack - Your Task Dashboard"
       default:
-        return "Welcome to EduTask"
+        return "Welcome to IQAC SmartTrack"
     }
   }
 
@@ -138,7 +138,7 @@ export default function Dashboard() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <TrendingUp className="h-8 w-8 text-blue-600" />
-                <h1 className="text-xl font-bold text-gray-900">EduTask</h1>
+                <h1 className="text-xl font-bold text-gray-900">IQAC SmartTrack</h1>
               </div>
             </div>
 

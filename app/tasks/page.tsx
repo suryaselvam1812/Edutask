@@ -8,32 +8,17 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import {
-  Users,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  Plus,
+  CalendarDays,
   Search,
-  Filter,
-  MoreHorizontal,
-  Edit,
-  Trash2,
-  Calendar,
   TrendingUp,
   LogOut,
+  Eye,
+  Edit,
+  Trash2,
+  Plus,
   Shield,
+  Users,
   GraduationCap,
 } from "lucide-react"
 import Link from "next/link"
@@ -47,18 +32,15 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true)
   const [tasks, setTasks] = useState<Task[]>([])
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([])
-  const [showNewTaskDialog, setShowNewTaskDialog] = useState(false)
-  const [showEditTaskDialog, setShowEditTaskDialog] = useState(false)
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [priorityFilter, setPriorityFilter] = useState("all")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [showNewTaskDialog, setShowNewTaskDialog] = useState(false)
+  const [showEditTaskDialog, setShowEditTaskDialog] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
   useEffect(() => {
-    const userData = localStorage.getItem("edutask_user")
+    const userData = localStorage.getItem("iqac_user")
     if (!userData) {
       router.push("/login")
       return
@@ -72,7 +54,7 @@ export default function TasksPage() {
 
   useEffect(() => {
     filterTasks()
-  }, [tasks, searchTerm, statusFilter, priorityFilter, departmentFilter, user])
+  }, [tasks, searchTerm, statusFilter, priorityFilter, user])
 
   const loadTasks = async () => {
     try {
@@ -89,36 +71,29 @@ export default function TasksPage() {
 
     let filtered = user.role === "staff" ? tasks.filter((task) => task.assigned_to === user.id) : tasks
 
-    // Search filter
     if (searchTerm) {
       filtered = filtered.filter(
         (task) =>
           task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
           task.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          task.assigned_user?.name.toLowerCase().includes(searchTerm.toLowerCase()),
+          task.assigned_user?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          task.department?.toLowerCase().includes(searchTerm.toLowerCase()),
       )
     }
 
-    // Status filter
     if (statusFilter !== "all") {
       filtered = filtered.filter((task) => task.status === statusFilter)
     }
 
-    // Priority filter
     if (priorityFilter !== "all") {
       filtered = filtered.filter((task) => task.priority === priorityFilter)
-    }
-
-    // Department filter
-    if (departmentFilter !== "all") {
-      filtered = filtered.filter((task) => task.department === departmentFilter)
     }
 
     setFilteredTasks(filtered)
   }
 
   const handleLogout = () => {
-    localStorage.removeItem("edutask_user")
+    localStorage.removeItem("iqac_user")
     router.push("/login")
   }
 
@@ -133,14 +108,19 @@ export default function TasksPage() {
     setSelectedTask(null)
   }
 
-  const handleDeleteTask = async () => {
-    if (!taskToDelete) return
+  const handleEditTask = (task: Task) => {
+    setSelectedTask(task)
+    setShowEditTaskDialog(true)
+  }
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm("Are you sure you want to delete this task?")) {
+      return
+    }
 
     try {
-      await deleteTask(taskToDelete.id)
-      setTasks((prev) => prev.filter((task) => task.id !== taskToDelete.id))
-      setShowDeleteDialog(false)
-      setTaskToDelete(null)
+      await deleteTask(taskId)
+      setTasks((prev) => prev.filter((task) => task.id !== taskId))
     } catch (error) {
       console.error("Failed to delete task:", error)
       alert("Failed to delete task. Please try again.")
@@ -173,31 +153,31 @@ export default function TasksPage() {
     }
   }
 
-  const getStatusIcon = (status: string) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case "completed":
-        return <CheckCircle className="h-4 w-4 text-green-600" />
+        return "bg-green-100 text-green-800"
       case "in_progress":
-        return <Clock className="h-4 w-4 text-blue-600" />
+        return "bg-blue-100 text-blue-800"
       case "pending":
-        return <AlertCircle className="h-4 w-4 text-orange-600" />
+        return "bg-orange-100 text-orange-800"
       default:
-        return <AlertCircle className="h-4 w-4" />
+        return "bg-gray-100 text-gray-800"
     }
   }
 
-  const departments = [
-    "Computer Science",
-    "Mathematics",
-    "Physics",
-    "Chemistry",
-    "Biology",
-    "English",
-    "History",
-    "Economics",
-    "Management",
-    "Engineering",
-  ]
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "high":
+        return "bg-red-100 text-red-800"
+      case "medium":
+        return "bg-yellow-100 text-yellow-800"
+      case "low":
+        return "bg-green-100 text-green-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
 
   if (loading) {
     return (
@@ -226,7 +206,7 @@ export default function TasksPage() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <TrendingUp className="h-8 w-8 text-blue-600" />
-                <h1 className="text-xl font-bold text-gray-900">EduTask</h1>
+                <h1 className="text-xl font-bold text-gray-900">IQAC SmartTrack</h1>
               </div>
             </div>
 
@@ -283,12 +263,16 @@ export default function TasksPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-6">
+          {/* Page Header */}
+          <div className="mb-8 flex justify-between items-center">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">{user.role === "staff" ? "My Tasks" : "All Tasks"}</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                {user.role === "staff" ? "My Tasks" : "Faculty Tasks"}
+              </h2>
               <p className="text-gray-600">
-                {user.role === "staff" ? "Tasks assigned to you" : "Manage and monitor all faculty tasks"}
+                {user.role === "staff"
+                  ? "View and manage your assigned tasks"
+                  : "Manage and track all faculty task assignments"}
               </p>
             </div>
             {canCreateTasks && (
@@ -301,115 +285,90 @@ export default function TasksPage() {
 
           {/* Filters */}
           <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">Filters</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    placeholder="Search tasks..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+            <CardContent className="p-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder="Search tasks, faculty, or departments..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
                 </div>
-
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Priority</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Departments" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Departments</SelectItem>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSearchTerm("")
-                    setStatusFilter("all")
-                    setPriorityFilter("all")
-                    setDepartmentFilter("all")
-                  }}
-                >
-                  <Filter className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
+                <div className="flex gap-4">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Priority</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Tasks List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Tasks ({filteredTasks.length})</CardTitle>
-              <CardDescription>
-                {user.role === "staff" ? "Your assigned tasks" : "All tasks in the system"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {filteredTasks.length === 0 ? (
-                <div className="text-center py-8">
-                  <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          {filteredTasks.length === 0 ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <div className="text-center">
+                  <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
                   <p className="text-gray-500 mb-4">
-                    {searchTerm || statusFilter !== "all" || priorityFilter !== "all" || departmentFilter !== "all"
-                      ? "Try adjusting your filters to see more tasks."
+                    {searchTerm || statusFilter !== "all" || priorityFilter !== "all"
+                      ? "Try adjusting your search criteria."
                       : user.role === "staff"
                         ? "No tasks have been assigned to you yet."
                         : "Get started by creating your first task."}
                   </p>
-                  {canCreateTasks &&
-                    !searchTerm &&
-                    statusFilter === "all" &&
-                    priorityFilter === "all" &&
-                    departmentFilter === "all" && (
-                      <Button onClick={() => setShowNewTaskDialog(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create First Task
-                      </Button>
-                    )}
+                  {canCreateTasks && !searchTerm && statusFilter === "all" && priorityFilter === "all" && (
+                    <Button onClick={() => setShowNewTaskDialog(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create First Task
+                    </Button>
+                  )}
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {filteredTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                    >
-                      <div className="flex items-center space-x-4 flex-1">
-                        <Avatar className="h-10 w-10">
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {filteredTasks.map((task) => (
+                <Card key={task.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <CardTitle className="text-xl">{task.title}</CardTitle>
+                          <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
+                          <Badge className={getStatusColor(task.status)}>{task.status.replace("_", " ")}</Badge>
+                        </div>
+                        <CardDescription className="text-base mb-4">{task.description}</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid md:grid-cols-2 gap-4 mb-4">
+                      <div className="flex items-center space-x-3">
+                        <Avatar className="h-8 w-8">
                           <AvatarImage src="/placeholder-user.jpg" />
                           <AvatarFallback>
                             {task.assigned_user?.name
@@ -418,96 +377,52 @@ export default function TasksPage() {
                               .join("") || "U"}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-gray-900 truncate">{task.title}</h4>
-                          <p className="text-sm text-gray-500 truncate">{task.description || "No description"}</p>
-                          <div className="flex items-center space-x-4 mt-1">
-                            <span className="text-xs text-gray-500">
-                              Assigned to: {task.assigned_user?.name || "Unassigned"}
-                            </span>
-                            {task.department && (
-                              <span className="text-xs text-gray-500">Department: {task.department}</span>
-                            )}
-                          </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Assigned to:</p>
+                          <p className="font-semibold">{task.assigned_user?.name || "Unassigned"}</p>
+                          <p className="text-sm text-gray-500">{task.department} Department</p>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-4">
-                        <div className="flex items-center space-x-2">
-                          {getStatusIcon(task.status)}
-                          <Badge
-                            variant={
-                              task.status === "completed"
-                                ? "default"
-                                : task.status === "in_progress"
-                                  ? "secondary"
-                                  : "outline"
-                            }
-                            className={
-                              task.status === "completed"
-                                ? "bg-green-100 text-green-800"
-                                : task.status === "in_progress"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : "bg-orange-100 text-orange-800"
-                            }
-                          >
-                            {task.status.replace("_", " ")}
-                          </Badge>
-                        </div>
-                        <Badge
-                          variant="outline"
-                          className={
-                            task.priority === "high"
-                              ? "border-red-200 text-red-800"
-                              : task.priority === "medium"
-                                ? "border-yellow-200 text-yellow-800"
-                                : "border-green-200 text-green-800"
-                          }
-                        >
-                          {task.priority}
-                        </Badge>
+                      <div>
                         {task.due_date && (
-                          <div className="flex items-center text-sm text-gray-500">
-                            <Calendar className="h-4 w-4 mr-1" />
-                            {new Date(task.due_date).toLocaleDateString()}
+                          <div className="flex items-center text-sm text-gray-600 mb-2">
+                            <CalendarDays className="h-4 w-4 mr-2" />
+                            Due: {new Date(task.due_date).toLocaleDateString()}
                           </div>
                         )}
-                        {canEditTasks && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedTask(task)
-                                  setShowEditTaskDialog(true)
-                                }}
-                              >
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setTaskToDelete(task)
-                                  setShowDeleteDialog(true)
-                                }}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
+                        <p className="text-sm text-gray-500">
+                          Created: {new Date(task.created_at).toLocaleDateString()}
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    <div className="flex justify-end space-x-2">
+                      <Button variant="outline" size="sm">
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Details
+                      </Button>
+                      {canEditTasks && (
+                        <>
+                          <Button variant="outline" size="sm" onClick={() => handleEditTask(task)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteTask(task.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       </main>
 
@@ -529,23 +444,6 @@ export default function TasksPage() {
           onTaskUpdated={handleTaskUpdated}
         />
       )}
-
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Task</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{taskToDelete?.title}"? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTask} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

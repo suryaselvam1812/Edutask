@@ -10,8 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Shield, Users, GraduationCap, BookOpen, TrendingUp } from "lucide-react"
-import { authenticateUser } from "@/lib/storage"
+import { Shield, Users, GraduationCap, AlertCircle, TrendingUp } from "lucide-react"
+import { signInUser } from "@/lib/storage"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -28,17 +28,25 @@ export default function LoginPage() {
     const email = formData.get("email") as string
     const password = formData.get("password") as string
 
-    try {
-      const user = await authenticateUser(email, password)
+    // Simple password validation for demo
+    const expectedPasswords = {
+      iqac: "iqac123",
+      hod: "hod123",
+      staff: "staff123",
+    }
 
-      if (user) {
-        localStorage.setItem("edutask_user", JSON.stringify(user))
-        router.push("/dashboard")
-      } else {
-        setError("Invalid credentials. Please try again.")
-      }
+    if (password !== expectedPasswords[activeTab as keyof typeof expectedPasswords]) {
+      setError("Invalid credentials")
+      setLoading(false)
+      return
+    }
+
+    try {
+      const user = await signInUser(email, activeTab)
+      localStorage.setItem("iqac_user", JSON.stringify(user))
+      router.push("/dashboard")
     } catch (err) {
-      setError("Login failed. Please try again.")
+      setError("Invalid credentials")
     } finally {
       setLoading(false)
     }
@@ -51,7 +59,7 @@ export default function LoginPage() {
           icon: <Shield className="h-6 w-6 text-blue-600" />,
           title: "IQAC Login",
           description: "Internal Quality Assurance Cell",
-          credentials: "iqac@university.edu / iqac123",
+          email: "iqac@university.edu",
           color: "border-blue-200 bg-blue-50",
         }
       case "hod":
@@ -59,7 +67,7 @@ export default function LoginPage() {
           icon: <Users className="h-6 w-6 text-green-600" />,
           title: "HOD Login",
           description: "Head of Department",
-          credentials: "hod@university.edu / hod123",
+          email: "hod@university.edu",
           color: "border-green-200 bg-green-50",
         }
       case "staff":
@@ -67,7 +75,7 @@ export default function LoginPage() {
           icon: <GraduationCap className="h-6 w-6 text-purple-600" />,
           title: "Staff Login",
           description: "Faculty Member",
-          credentials: "staff@university.edu / staff123",
+          email: "staff@university.edu",
           color: "border-purple-200 bg-purple-50",
         }
       default:
@@ -75,7 +83,7 @@ export default function LoginPage() {
           icon: <Users className="h-6 w-6" />,
           title: "Login",
           description: "",
-          credentials: "",
+          email: "",
           color: "",
         }
     }
@@ -84,124 +92,116 @@ export default function LoginPage() {
   const roleInfo = getRoleInfo(activeTab)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <div className="bg-blue-600 p-3 rounded-full">
-              <TrendingUp className="h-8 w-8 text-white" />
-            </div>
+            <TrendingUp className="h-12 w-12 text-blue-600 mr-3" />
+            <h1 className="text-3xl font-bold text-gray-900">IQAC SmartTrack</h1>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">EduTask</h1>
-          <p className="text-gray-600">Faculty Task Management System</p>
+          <p className="text-gray-600">Quality Assurance Management System</p>
         </div>
 
         <Card className="shadow-lg">
-          <CardHeader className="text-center pb-4">
-            <div className="flex items-center justify-center mb-2">{roleInfo.icon}</div>
-            <CardTitle className="text-xl">{roleInfo.title}</CardTitle>
-            <CardDescription>{roleInfo.description}</CardDescription>
+          <CardHeader className="space-y-1">
+            <div className={`flex items-center justify-center p-3 rounded-lg ${roleInfo.color}`}>
+              {roleInfo.icon}
+              <div className="ml-3">
+                <CardTitle className="text-xl">{roleInfo.title}</CardTitle>
+                <CardDescription>{roleInfo.description}</CardDescription>
+              </div>
+            </div>
           </CardHeader>
-
           <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="iqac" className="text-xs">
+                  <Shield className="h-4 w-4 mr-1" />
                   IQAC
                 </TabsTrigger>
                 <TabsTrigger value="hod" className="text-xs">
+                  <Users className="h-4 w-4 mr-1" />
                   HOD
                 </TabsTrigger>
                 <TabsTrigger value="staff" className="text-xs">
+                  <GraduationCap className="h-4 w-4 mr-1" />
                   Staff
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="iqac">
-                <div className={`p-3 rounded-lg mb-4 ${roleInfo.color}`}>
-                  <p className="text-sm text-gray-700">
-                    <strong>Demo Credentials:</strong>
-                    <br />
-                    {roleInfo.credentials}
-                  </p>
-                </div>
-              </TabsContent>
+              {["iqac", "hod", "staff"].map((role) => (
+                <TabsContent key={role} value={role} className="space-y-4 mt-6">
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        defaultValue={getRoleInfo(role).email}
+                        required
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        name="password"
+                        type="password"
+                        required
+                        className="w-full"
+                        placeholder={`Enter ${role} password`}
+                      />
+                    </div>
 
-              <TabsContent value="hod">
-                <div className={`p-3 rounded-lg mb-4 ${roleInfo.color}`}>
-                  <p className="text-sm text-gray-700">
-                    <strong>Demo Credentials:</strong>
-                    <br />
-                    {roleInfo.credentials}
-                  </p>
-                </div>
-              </TabsContent>
+                    {error && (
+                      <Alert className="border-red-200 bg-red-50">
+                        <AlertCircle className="h-4 w-4 text-red-600" />
+                        <AlertDescription className="text-red-800">{error}</AlertDescription>
+                      </Alert>
+                    )}
 
-              <TabsContent value="staff">
-                <div className={`p-3 rounded-lg mb-4 ${roleInfo.color}`}>
-                  <p className="text-sm text-gray-700">
-                    <strong>Demo Credentials:</strong>
-                    <br />
-                    {roleInfo.credentials}
-                  </p>
-                </div>
-              </TabsContent>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {loading ? "Signing in..." : `Sign in as ${role.toUpperCase()}`}
+                    </Button>
+                  </form>
+
+                  {/* Demo credentials */}
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600 font-medium mb-2">Demo Credentials:</p>
+                    <div className="text-xs text-gray-500 space-y-1">
+                      <p>Email: {getRoleInfo(role).email}</p>
+                      <p>Password: {role}123</p>
+                    </div>
+                  </div>
+                </TabsContent>
+              ))}
             </Tabs>
-
-            {error && (
-              <Alert className="mb-4 border-red-200 bg-red-50">
-                <AlertDescription className="text-red-800">{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  required
-                  className="bg-white"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  required
-                  className="bg-white"
-                />
-              </div>
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing in..." : "Sign In"}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">Secure access for authorized personnel only</p>
-            </div>
           </CardContent>
         </Card>
 
         {/* Features */}
-        <div className="mt-8 grid grid-cols-2 gap-4 text-center">
-          <div className="bg-white p-4 rounded-lg shadow-sm">
-            <BookOpen className="h-6 w-6 text-blue-600 mx-auto mb-2" />
-            <p className="text-sm font-medium text-gray-900">Task Management</p>
-            <p className="text-xs text-gray-600">Organize & track tasks</p>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm">
-            <Shield className="h-6 w-6 text-green-600 mx-auto mb-2" />
-            <p className="text-sm font-medium text-gray-900">Quality Assurance</p>
-            <p className="text-xs text-gray-600">IQAC compliance</p>
+        <div className="mt-8 text-center">
+          <p className="text-sm text-gray-600 mb-4">Key Features:</p>
+          <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
+            <div className="flex items-center">
+              <Shield className="h-4 w-4 mr-2 text-blue-500" />
+              Task Management
+            </div>
+            <div className="flex items-center">
+              <Users className="h-4 w-4 mr-2 text-green-500" />
+              Faculty Tracking
+            </div>
+            <div className="flex items-center">
+              <GraduationCap className="h-4 w-4 mr-2 text-purple-500" />
+              File Upload
+            </div>
+            <div className="flex items-center">
+              <TrendingUp className="h-4 w-4 mr-2 text-orange-500" />
+              Progress Reports
+            </div>
           </div>
         </div>
       </div>
