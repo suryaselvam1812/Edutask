@@ -3,176 +3,164 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarDays, Edit } from "lucide-react"
-
-interface Task {
-  id: number
-  title: string
-  description: string
-  faculty: string
-  department: string
-  dueDate: string
-  status: string
-  priority: string
-  createdDate: string
-}
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CalendarIcon } from "lucide-react"
+import { format } from "date-fns"
+import { updateTask, getUsers, type Task, type User } from "@/lib/storage"
 
 interface EditTaskDialogProps {
-  task: Task
-  onTaskUpdate: (updatedTask: Task) => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  task: Task | null
+  onTaskUpdated: (task: Task) => void
 }
 
-export function EditTaskDialog({ task, onTaskUpdate }: EditTaskDialogProps) {
-  const [open, setOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+export function EditTaskDialog({ open, onOpenChange, task, onTaskUpdated }: EditTaskDialogProps) {
+  const [loading, setLoading] = useState(false)
+  const [users, setUsers] = useState<User[]>([])
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    faculty: "",
+    assigned_to: "",
     department: "",
-    dueDate: "",
-    priority: "medium",
-    status: "pending",
+    due_date: undefined as Date | undefined,
+    priority: "medium" as "low" | "medium" | "high",
+    status: "pending" as "pending" | "in_progress" | "completed",
   })
-
-  useEffect(() => {
-    if (task) {
-      setFormData({
-        title: task.title,
-        description: task.description,
-        faculty: task.faculty,
-        department: task.department,
-        dueDate: task.dueDate,
-        priority: task.priority,
-        status: task.status,
-      })
-    }
-  }, [task])
 
   const departments = [
     "Computer Science",
-    "Electronics",
     "Mathematics",
     "Physics",
     "Chemistry",
-    "Mechanical Engineering",
-    "Civil Engineering",
+    "Biology",
     "English",
-    "Commerce",
+    "History",
+    "Economics",
     "Management",
+    "Engineering",
   ]
 
-  const facultyMembers = [
-    "Dr. Sarah Johnson",
-    "Prof. Michael Chen",
-    "Dr. Emily Davis",
-    "Prof. Robert Wilson",
-    "Dr. Lisa Anderson",
-    "Dr. James Smith",
-    "Prof. Maria Garcia",
-    "Dr. David Brown",
-  ]
+  useEffect(() => {
+    if (open && task) {
+      setFormData({
+        title: task.title,
+        description: task.description || "",
+        assigned_to: task.assigned_to || "",
+        department: task.department || "",
+        due_date: task.due_date ? new Date(task.due_date) : undefined,
+        priority: task.priority,
+        status: task.status,
+      })
+      loadUsers()
+    }
+  }, [open, task])
+
+  const loadUsers = async () => {
+    try {
+      const usersData = await getUsers("staff")
+      setUsers(usersData || [])
+    } catch (error) {
+      console.error("Failed to load users:", error)
+      setUsers([])
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    const updatedTask = {
-      ...task,
-      ...formData,
+    if (!task || !formData.title.trim()) {
+      return
     }
 
-    onTaskUpdate(updatedTask)
-    setIsLoading(false)
-    setOpen(false)
+    setLoading(true)
+    try {
+      const updates = {
+        title: formData.title,
+        description: formData.description || undefined,
+        assigned_to: formData.assigned_to || undefined,
+        department: formData.department || undefined,
+        due_date: formData.due_date?.toISOString() || undefined,
+        priority: formData.priority,
+        status: formData.status,
+      }
+
+      const updatedTask = await updateTask(task.id, updates)
+      onTaskUpdated(updatedTask)
+    } catch (error) {
+      console.error("Failed to update task:", error)
+      alert("Failed to update task. Please try again.")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-  }
+  if (!task) return null
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Edit className="h-4 w-4 mr-2" />
-          Edit Task
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Edit Task</DialogTitle>
           <DialogDescription>Update task details and assignment information.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="edit-title">Task Title *</Label>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <Label htmlFor="title">Task Title *</Label>
               <Input
-                id="edit-title"
+                id="title"
                 value={formData.title}
-                onChange={(e) => handleInputChange("title", e.target.value)}
+                onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
                 placeholder="Enter task title"
                 required
               />
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="edit-description">Description *</Label>
+            <div>
+              <Label htmlFor="description">Description</Label>
               <Textarea
-                id="edit-description"
+                id="description"
                 value={formData.description}
-                onChange={(e) => handleInputChange("description", e.target.value)}
-                placeholder="Describe the task requirements and objectives"
+                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter task description"
                 rows={3}
-                required
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-faculty">Assign to Faculty *</Label>
+              <div>
+                <Label htmlFor="assigned_to">Assign to Faculty</Label>
                 <Select
-                  value={formData.faculty}
-                  onValueChange={(value) => handleInputChange("faculty", value)}
-                  required
+                  value={formData.assigned_to}
+                  onValueChange={(value) => setFormData((prev) => ({ ...prev, assigned_to: value }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select faculty member" />
                   </SelectTrigger>
                   <SelectContent>
-                    {facultyMembers.map((faculty) => (
-                      <SelectItem key={faculty} value={faculty}>
-                        {faculty}
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name} - {user.department}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="edit-department">Department *</Label>
+              <div>
+                <Label htmlFor="department">Department</Label>
                 <Select
                   value={formData.department}
-                  onValueChange={(value) => handleInputChange("department", value)}
-                  required
+                  onValueChange={(value) => setFormData((prev) => ({ ...prev, department: value }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select department" />
@@ -189,23 +177,34 @@ export function EditTaskDialog({ task, onTaskUpdate }: EditTaskDialogProps) {
             </div>
 
             <div className="grid grid-cols-3 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-dueDate">Due Date *</Label>
-                <div className="relative">
-                  <Input
-                    id="edit-dueDate"
-                    type="date"
-                    value={formData.dueDate}
-                    onChange={(e) => handleInputChange("dueDate", e.target.value)}
-                    required
-                  />
-                  <CalendarDays className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
-                </div>
+              <div>
+                <Label>Due Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal bg-transparent">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.due_date ? format(formData.due_date, "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.due_date}
+                      onSelect={(date) => setFormData((prev) => ({ ...prev, due_date: date }))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="edit-priority">Priority</Label>
-                <Select value={formData.priority} onValueChange={(value) => handleInputChange("priority", value)}>
+              <div>
+                <Label htmlFor="priority">Priority</Label>
+                <Select
+                  value={formData.priority}
+                  onValueChange={(value: "low" | "medium" | "high") =>
+                    setFormData((prev) => ({ ...prev, priority: value }))
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -217,15 +216,20 @@ export function EditTaskDialog({ task, onTaskUpdate }: EditTaskDialogProps) {
                 </Select>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="edit-status">Status</Label>
-                <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
+              <div>
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value: "pending" | "in_progress" | "completed") =>
+                    setFormData((prev) => ({ ...prev, status: value }))
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="in-progress">In Progress</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
                     <SelectItem value="completed">Completed</SelectItem>
                   </SelectContent>
                 </Select>
@@ -233,14 +237,14 @@ export function EditTaskDialog({ task, onTaskUpdate }: EditTaskDialogProps) {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Updating..." : "Update Task"}
+            <Button type="submit" disabled={loading || !formData.title.trim()}>
+              {loading ? "Updating..." : "Update Task"}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

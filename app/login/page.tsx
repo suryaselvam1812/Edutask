@@ -3,190 +3,207 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { TrendingUp, Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { Shield, Users, GraduationCap, AlertCircle, TrendingUp } from "lucide-react"
+import { signInUser } from "@/lib/storage"
 
 export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    rememberMe: false,
-  })
   const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [activeTab, setActiveTab] = useState("iqac")
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }))
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setIsLoading(true)
+    setLoading(true)
     setError("")
 
-    // Simulate login process
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+    const formData = new FormData(e.currentTarget)
+    const email = formData.get("email") as string
+    const password = formData.get("password") as string
 
-      // Simple validation for demo
-      if (formData.email === "admin@iqac.edu" && formData.password === "admin123") {
-        // Simulate successful login
-        localStorage.setItem(
-          "iqac_user",
-          JSON.stringify({
-            email: formData.email,
-            role: "admin",
-            name: "IQAC Administrator",
-          }),
-        )
-        router.push("/")
-      } else if (formData.email.includes("@") && formData.password.length >= 6) {
-        // Faculty login
-        localStorage.setItem(
-          "iqac_user",
-          JSON.stringify({
-            email: formData.email,
-            role: "faculty",
-            name: "Faculty Member",
-          }),
-        )
-        router.push("/")
-      } else {
-        setError("Invalid email or password. Try admin@iqac.edu / admin123")
-      }
+    // Simple password validation for demo
+    const expectedPasswords = {
+      iqac: "iqac123",
+      hod: "hod123",
+      staff: "staff123",
+    }
+
+    if (password !== expectedPasswords[activeTab as keyof typeof expectedPasswords]) {
+      setError("Invalid credentials")
+      setLoading(false)
+      return
+    }
+
+    try {
+      const user = await signInUser(email, activeTab)
+      localStorage.setItem("iqac_user", JSON.stringify(user))
+      router.push("/dashboard")
     } catch (err) {
-      setError("Login failed. Please try again.")
+      setError("Invalid credentials")
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
+
+  const getRoleInfo = (role: string) => {
+    switch (role) {
+      case "iqac":
+        return {
+          icon: <Shield className="h-6 w-6 text-blue-600" />,
+          title: "IQAC Login",
+          description: "Internal Quality Assurance Cell",
+          email: "iqac@university.edu",
+          color: "border-blue-200 bg-blue-50",
+        }
+      case "hod":
+        return {
+          icon: <Users className="h-6 w-6 text-green-600" />,
+          title: "HOD Login",
+          description: "Head of Department",
+          email: "hod@university.edu",
+          color: "border-green-200 bg-green-50",
+        }
+      case "staff":
+        return {
+          icon: <GraduationCap className="h-6 w-6 text-purple-600" />,
+          title: "Staff Login",
+          description: "Faculty Member",
+          email: "staff@university.edu",
+          color: "border-purple-200 bg-purple-50",
+        }
+      default:
+        return {
+          icon: <Users className="h-6 w-6" />,
+          title: "Login",
+          description: "",
+          email: "",
+          color: "",
+        }
+    }
+  }
+
+  const roleInfo = getRoleInfo(activeTab)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo and Title */}
+        {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex justify-center items-center mb-4">
-            <TrendingUp className="h-12 w-12 text-blue-600" />
+          <div className="flex items-center justify-center mb-4">
+            <TrendingUp className="h-12 w-12 text-blue-600 mr-3" />
+            <h1 className="text-3xl font-bold text-gray-900">IQAC SmartTrack</h1>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">IQAC SmartTrack</h1>
-          <p className="text-gray-600">Faculty Task Management System</p>
+          <p className="text-gray-600">Quality Assurance Management System</p>
         </div>
 
-        {/* Login Card */}
         <Card className="shadow-lg">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl text-center">Welcome Back</CardTitle>
-            <CardDescription className="text-center">Sign in to your account to continue</CardDescription>
+            <div className={`flex items-center justify-center p-3 rounded-lg ${roleInfo.color}`}>
+              {roleInfo.icon}
+              <div className="ml-3">
+                <CardTitle className="text-xl">{roleInfo.title}</CardTitle>
+                <CardDescription>{roleInfo.description}</CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="iqac" className="text-xs">
+                  <Shield className="h-4 w-4 mr-1" />
+                  IQAC
+                </TabsTrigger>
+                <TabsTrigger value="hod" className="text-xs">
+                  <Users className="h-4 w-4 mr-1" />
+                  HOD
+                </TabsTrigger>
+                <TabsTrigger value="staff" className="text-xs">
+                  <GraduationCap className="h-4 w-4 mr-1" />
+                  Staff
+                </TabsTrigger>
+              </TabsList>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-              </div>
+              {["iqac", "hod", "staff"].map((role) => (
+                <TabsContent key={role} value={role} className="space-y-4 mt-6">
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        defaultValue={getRoleInfo(role).email}
+                        required
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        name="password"
+                        type="password"
+                        required
+                        className="w-full"
+                        placeholder={`Enter ${role} password`}
+                      />
+                    </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    className="pl-10 pr-10"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
+                    {error && (
+                      <Alert className="border-red-200 bg-red-50">
+                        <AlertCircle className="h-4 w-4 text-red-600" />
+                        <AlertDescription className="text-red-800">{error}</AlertDescription>
+                      </Alert>
+                    )}
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="rememberMe"
-                    name="rememberMe"
-                    checked={formData.rememberMe}
-                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, rememberMe: checked as boolean }))}
-                  />
-                  <Label htmlFor="rememberMe" className="text-sm">
-                    Remember me
-                  </Label>
-                </div>
-                <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
-                  Forgot password?
-                </Link>
-              </div>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {loading ? "Signing in..." : `Sign in as ${role.toUpperCase()}`}
+                    </Button>
+                  </form>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Signing in..." : "Sign In"}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                {"Don't have an account? "}
-                <Link href="/register" className="text-blue-600 hover:underline">
-                  Contact Administrator
-                </Link>
-              </p>
-            </div>
-
-            {/* Demo Credentials */}
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700 mb-2">Demo Credentials:</p>
-              <div className="text-xs text-gray-600 space-y-1">
-                <p>
-                  <strong>Admin:</strong> admin@iqac.edu / admin123
-                </p>
-                <p>
-                  <strong>Faculty:</strong> Any valid email / 6+ chars password
-                </p>
-              </div>
-            </div>
+                  {/* Demo credentials */}
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600 font-medium mb-2">Demo Credentials:</p>
+                    <div className="text-xs text-gray-500 space-y-1">
+                      <p>Email: {getRoleInfo(role).email}</p>
+                      <p>Password: {role}123</p>
+                    </div>
+                  </div>
+                </TabsContent>
+              ))}
+            </Tabs>
           </CardContent>
         </Card>
+
+        {/* Features */}
+        <div className="mt-8 text-center">
+          <p className="text-sm text-gray-600 mb-4">Key Features:</p>
+          <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
+            <div className="flex items-center">
+              <Shield className="h-4 w-4 mr-2 text-blue-500" />
+              Task Management
+            </div>
+            <div className="flex items-center">
+              <Users className="h-4 w-4 mr-2 text-green-500" />
+              Faculty Tracking
+            </div>
+            <div className="flex items-center">
+              <GraduationCap className="h-4 w-4 mr-2 text-purple-500" />
+              File Upload
+            </div>
+            <div className="flex items-center">
+              <TrendingUp className="h-4 w-4 mr-2 text-orange-500" />
+              Progress Reports
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

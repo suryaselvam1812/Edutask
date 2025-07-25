@@ -1,144 +1,71 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { CalendarDays, Users, CheckCircle, Clock, AlertCircle, TrendingUp, LogOut } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  Users,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Plus,
+  FileText,
+  Calendar,
+  Shield,
+  GraduationCap,
+  LogOut,
+  TrendingUp,
+} from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { NewTaskDialog } from "@/components/new-task-dialog"
+import { getTasks, type Task, type User } from "@/lib/storage"
 
-interface User {
-  email: string
-  role: string
-  name: string
-}
-
-interface Task {
-  id: number
-  title: string
-  description: string
-  faculty: string
-  department: string
-  dueDate: string
-  status: string
-  priority: string
-  createdDate: string
-}
-
-export default function DashboardPage() {
-  const [user, setUser] = useState<User | null>(null)
-  const [tasks, setTasks] = useState<Task[]>([])
+export default function Dashboard() {
   const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [showNewTaskDialog, setShowNewTaskDialog] = useState(false)
 
   useEffect(() => {
     const userData = localStorage.getItem("iqac_user")
     if (!userData) {
       router.push("/login")
-    } else {
-      setUser(JSON.parse(userData))
+      return
     }
 
-    // Initialize tasks
-    const initialTasks = [
-      {
-        id: 1,
-        title: "Submit Course Outcome Assessment",
-        description: "Complete assessment for all courses taught in the current semester",
-        faculty: "Dr. Sarah Johnson",
-        department: "Computer Science",
-        dueDate: "2024-01-15",
-        status: "pending",
-        priority: "high",
-        createdDate: "2024-01-01",
-      },
-      {
-        id: 2,
-        title: "Update Curriculum Mapping",
-        description: "Map curriculum to program outcomes and course objectives",
-        faculty: "Prof. Michael Chen",
-        department: "Electronics",
-        dueDate: "2024-01-18",
-        status: "in-progress",
-        priority: "medium",
-        createdDate: "2024-01-02",
-      },
-      {
-        id: 3,
-        title: "Prepare NAAC Documentation",
-        description: "Compile all required documents for NAAC accreditation",
-        faculty: "Dr. Emily Davis",
-        department: "Mathematics",
-        dueDate: "2024-01-20",
-        status: "completed",
-        priority: "high",
-        createdDate: "2024-01-03",
-      },
-      {
-        id: 4,
-        title: "Faculty Development Program Report",
-        description: "Submit report on attended faculty development programs",
-        faculty: "Prof. Robert Wilson",
-        department: "Physics",
-        dueDate: "2024-01-22",
-        status: "pending",
-        priority: "low",
-        createdDate: "2024-01-04",
-      },
-      {
-        id: 5,
-        title: "Research Publication Summary",
-        description: "Provide summary of research publications for the academic year",
-        faculty: "Dr. Lisa Anderson",
-        department: "Chemistry",
-        dueDate: "2024-01-25",
-        status: "in-progress",
-        priority: "medium",
-        createdDate: "2024-01-05",
-      },
-    ]
-    setTasks(initialTasks)
+    const parsedUser = JSON.parse(userData)
+    setUser(parsedUser)
+    loadTasks()
+    setLoading(false)
   }, [router])
+
+  const loadTasks = async () => {
+    try {
+      const tasksData = await getTasks()
+      setTasks(tasksData || [])
+    } catch (error) {
+      console.error("Failed to load tasks:", error)
+      setTasks([])
+    }
+  }
 
   const handleLogout = () => {
     localStorage.removeItem("iqac_user")
     router.push("/login")
   }
 
-  const handleTaskCreate = (newTask: Task) => {
+  const handleTaskCreated = (newTask: Task) => {
     setTasks((prev) => [newTask, ...prev])
+    setShowNewTaskDialog(false)
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "bg-green-100 text-green-800"
-      case "in-progress":
-        return "bg-yellow-100 text-yellow-800"
-      case "pending":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return "bg-red-100 text-red-800"
-      case "medium":
-        return "bg-yellow-100 text-yellow-800"
-      case "low":
-        return "bg-green-100 text-green-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  if (!user) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading...</p>
@@ -147,11 +74,60 @@ export default function DashboardPage() {
     )
   }
 
-  const totalTasks = tasks.length
-  const completedTasks = tasks.filter((task) => task.status === "completed").length
-  const inProgressTasks = tasks.filter((task) => task.status === "in-progress").length
-  const pendingTasks = tasks.filter((task) => task.status === "pending").length
-  const recentTasks = tasks.slice(0, 5)
+  if (!user) {
+    return null
+  }
+
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case "iqac":
+        return <Shield className="h-5 w-5 text-blue-600" />
+      case "hod":
+        return <Users className="h-5 w-5 text-green-600" />
+      case "staff":
+        return <GraduationCap className="h-5 w-5 text-purple-600" />
+      default:
+        return <Users className="h-5 w-5" />
+    }
+  }
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case "iqac":
+        return "bg-blue-100 text-blue-800"
+      case "hod":
+        return "bg-green-100 text-green-800"
+      case "staff":
+        return "bg-purple-100 text-purple-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getWelcomeMessage = (role: string) => {
+    switch (role) {
+      case "iqac":
+        return "Welcome to IQAC SmartTrack - Quality Assurance Dashboard"
+      case "hod":
+        return "Welcome to IQAC SmartTrack - Department Management Dashboard"
+      case "staff":
+        return "Welcome to IQAC SmartTrack - Your Task Dashboard"
+      default:
+        return "Welcome to IQAC SmartTrack"
+    }
+  }
+
+  // Filter tasks based on user role
+  const filteredTasks = user.role === "staff" ? tasks.filter((task) => task.assigned_to === user.id) : tasks
+
+  const totalTasks = filteredTasks.length
+  const completedTasks = filteredTasks.filter((task) => task.status === "completed").length
+  const inProgressTasks = filteredTasks.filter((task) => task.status === "in_progress").length
+  const pendingTasks = filteredTasks.filter((task) => task.status === "pending").length
+
+  const recentTasks = filteredTasks.slice(0, 5)
+
+  const canCreateTasks = user.role === "iqac" || user.role === "hod"
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -159,139 +135,242 @@ export default function DashboardPage() {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <TrendingUp className="h-8 w-8 text-blue-600 mr-3" />
-              <h1 className="text-2xl font-bold text-gray-900">IQAC SmartTrack</h1>
-            </div>
-            <nav className="hidden md:flex space-x-8">
-              <Link href="/dashboard" className="text-blue-600 font-medium">
-                Dashboard
-              </Link>
-              <Link href="/tasks" className="text-gray-500 hover:text-gray-700">
-                Tasks
-              </Link>
-              <Link href="/faculty" className="text-gray-500 hover:text-gray-700">
-                Faculty
-              </Link>
-              <Link href="/upload" className="text-gray-500 hover:text-gray-700">
-                Upload
-              </Link>
-              <Link href="/reports" className="text-gray-500 hover:text-gray-700">
-                Reports
-              </Link>
-            </nav>
             <div className="flex items-center space-x-4">
-              <div className="text-sm">
-                <p className="font-medium text-gray-900">{user.name}</p>
-                <p className="text-gray-500 capitalize">{user.role}</p>
+              <div className="flex items-center space-x-2">
+                <TrendingUp className="h-8 w-8 text-blue-600" />
+                <h1 className="text-xl font-bold text-gray-900">IQAC SmartTrack</h1>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                {getRoleIcon(user.role)}
+                <span className="text-sm font-medium text-gray-700">{user.name}</span>
+                <Badge className={getRoleColor(user.role)}>{user.role.toUpperCase()}</Badge>
               </div>
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
               </Button>
-              <NewTaskDialog onTaskCreate={handleTaskCreate} />
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome back, {user.name}!</h2>
-          <p className="text-gray-600">
-            {user.role === "admin"
-              ? "Here's an overview of all faculty tasks and system activity."
-              : "Here's your task dashboard and recent assignments."}
-          </p>
+      {/* Navigation */}
+      <nav className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex space-x-8">
+            <Link href="/dashboard" className="border-b-2 border-blue-500 py-4 px-1 text-sm font-medium text-blue-600">
+              Dashboard
+            </Link>
+            <Link
+              href="/tasks"
+              className="border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            >
+              {user.role === "staff" ? "My Tasks" : "All Tasks"}
+            </Link>
+            <Link
+              href="/faculty"
+              className="border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            >
+              Faculty
+            </Link>
+            <Link
+              href="/upload"
+              className="border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            >
+              Upload Files
+            </Link>
+            <Link
+              href="/reports"
+              className="border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            >
+              Reports
+            </Link>
+          </div>
         </div>
+      </nav>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
+          {/* Welcome Section */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">{getWelcomeMessage(user.role)}</h2>
+            <p className="text-gray-600">
+              {user.role === "staff"
+                ? "Track your assigned tasks and manage your submissions."
+                : "Manage faculty tasks and monitor quality assurance activities."}
+            </p>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalTasks}</div>
+                <p className="text-xs text-muted-foreground">
+                  {user.role === "staff" ? "Assigned to you" : "All tasks in system"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Completed</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{completedTasks}</div>
+                <p className="text-xs text-muted-foreground">
+                  {totalTasks > 0
+                    ? `${Math.round((completedTasks / totalTasks) * 100)}% completion rate`
+                    : "No tasks yet"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+                <Clock className="h-4 w-4 text-blue-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">{inProgressTasks}</div>
+                <p className="text-xs text-muted-foreground">Currently being worked on</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pending</CardTitle>
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">{pendingTasks}</div>
+                <p className="text-xs text-muted-foreground">Awaiting action</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Tasks */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
-              <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Recent Tasks</CardTitle>
+                <CardDescription>
+                  {user.role === "staff" ? "Your latest assigned tasks" : "Latest tasks in the system"}
+                </CardDescription>
+              </div>
+              {canCreateTasks && (
+                <Button onClick={() => setShowNewTaskDialog(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Task
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalTasks}</div>
-              <p className="text-xs text-muted-foreground">Active assignments</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{completedTasks}</div>
-              <p className="text-xs text-muted-foreground">Tasks finished</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{inProgressTasks}</div>
-              <p className="text-xs text-muted-foreground">Currently active</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Faculty Members</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">24</div>
-              <p className="text-xs text-muted-foreground">Active members</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Tasks */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Tasks</CardTitle>
-            <CardDescription>Latest task assignments and their current status</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentTasks.map((task) => (
-                <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900">{task.title}</h4>
-                    <p className="text-sm text-gray-600 mt-1">{task.description}</p>
-                    <div className="flex items-center mt-2 space-x-4">
-                      <span className="text-sm text-gray-500">
-                        Assigned to: <span className="font-medium">{task.faculty}</span>
-                      </span>
-                      <span className="text-sm text-gray-500">Department: {task.department}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2 ml-4">
-                    <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
-                    <Badge className={getStatusColor(task.status)}>{task.status.replace("-", " ")}</Badge>
-                    <div className="text-sm text-gray-500 flex items-center">
-                      <CalendarDays className="h-4 w-4 mr-1" />
-                      {new Date(task.dueDate).toLocaleDateString()}
-                    </div>
-                  </div>
+              {recentTasks.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks yet</h3>
+                  <p className="text-gray-500 mb-4">
+                    {user.role === "staff"
+                      ? "No tasks have been assigned to you yet."
+                      : "Get started by creating your first task."}
+                  </p>
+                  {canCreateTasks && (
+                    <Button onClick={() => setShowNewTaskDialog(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create First Task
+                    </Button>
+                  )}
                 </div>
-              ))}
-            </div>
-            <div className="mt-6 text-center">
-              <Link href="/tasks">
-                <Button variant="outline">View All Tasks</Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+              ) : (
+                <div className="space-y-4">
+                  {recentTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src="/placeholder-user.jpg" />
+                          <AvatarFallback>
+                            {task.assigned_user?.name
+                              ?.split(" ")
+                              .map((n) => n[0])
+                              .join("") || "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h4 className="font-medium text-gray-900">{task.title}</h4>
+                          <p className="text-sm text-gray-500">
+                            Assigned to: {task.assigned_user?.name || "Unassigned"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <Badge
+                          variant={
+                            task.status === "completed"
+                              ? "default"
+                              : task.status === "in_progress"
+                                ? "secondary"
+                                : "outline"
+                          }
+                          className={
+                            task.status === "completed"
+                              ? "bg-green-100 text-green-800"
+                              : task.status === "in_progress"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-orange-100 text-orange-800"
+                          }
+                        >
+                          {task.status.replace("_", " ")}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={
+                            task.priority === "high"
+                              ? "border-red-200 text-red-800"
+                              : task.priority === "medium"
+                                ? "border-yellow-200 text-yellow-800"
+                                : "border-green-200 text-green-800"
+                          }
+                        >
+                          {task.priority}
+                        </Badge>
+                        {task.due_date && (
+                          <div className="flex items-center text-sm text-gray-500">
+                            <Calendar className="h-4 w-4 mr-1" />
+                            {new Date(task.due_date).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </main>
+
+      {/* New Task Dialog */}
+      {showNewTaskDialog && (
+        <NewTaskDialog
+          open={showNewTaskDialog}
+          onOpenChange={setShowNewTaskDialog}
+          onTaskCreated={handleTaskCreated}
+          currentUser={user}
+        />
+      )}
     </div>
   )
 }
