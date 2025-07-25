@@ -8,7 +8,7 @@ export default function HomePage() {
 
   useEffect(() => {
     // Check if user is already logged in
-    const userData = localStorage.getItem("iqac_user")
+    const userData = localStorage.getItem("edutask_user")
     if (userData) {
       router.push("/dashboard")
     } else {

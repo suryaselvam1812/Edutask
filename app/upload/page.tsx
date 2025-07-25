@@ -2,91 +2,87 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   Upload,
+  FileText,
+  ImageIcon,
   File,
+  Download,
+  Trash2,
+  MoreHorizontal,
   X,
+  TrendingUp,
+  LogOut,
   Shield,
   Users,
   GraduationCap,
-  LogOut,
-  FileText,
-  ImageIcon,
-  Download,
-  Trash2,
-  Calendar,
-  TrendingUp,
-  CheckCircle,
-  AlertCircle,
-  User,
 } from "lucide-react"
 import Link from "next/link"
-import { getTasks, uploadFile, getUploadedFiles, deleteFile, type Task, type UploadedFile } from "@/lib/storage"
+import { getTasks, getFiles, uploadFile, deleteFile, type Task, type User, type UploadedFile } from "@/lib/storage"
 
 export default function UploadPage() {
   const router = useRouter()
-  const [userData, setUserData] = useState<any | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [tasks, setTasks] = useState<Task[]>([])
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [files, setFiles] = useState<UploadedFile[]>([])
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
-  const [selectedTask, setSelectedTask] = useState("")
-  const [uploadTitle, setUploadTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [category, setCategory] = useState("")
   const [dragActive, setDragActive] = useState(false)
-  const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState("")
+  const [selectedTask, setSelectedTask] = useState("")
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [fileToDelete, setFileToDelete] = useState<UploadedFile | null>(null)
 
-  const categories = [
-    "Assessment Reports",
-    "Documentation",
-    "Certificates",
-    "Presentations",
-    "Research Papers",
-    "Meeting Minutes",
-    "Other",
-  ]
+  const categories = ["Assessment", "Certificate", "Report", "Documentation", "Research", "Presentation", "Other"]
 
   useEffect(() => {
-    const userData = localStorage.getItem("iqac_user")
+    const userData = localStorage.getItem("edutask_user")
     if (!userData) {
       router.push("/login")
       return
     }
 
     const parsedUser = JSON.parse(userData)
-    setUserData(parsedUser)
+    setUser(parsedUser)
     loadData()
     setLoading(false)
   }, [router])
 
   const loadData = async () => {
     try {
-      const [tasksData, filesData] = await Promise.all([getTasks(), getUploadedFiles()])
+      const [tasksData, filesData] = await Promise.all([getTasks(), getFiles()])
       setTasks(tasksData || [])
-      setUploadedFiles(filesData || [])
+      setFiles(filesData || [])
     } catch (error) {
       console.error("Failed to load data:", error)
       setTasks([])
-      setUploadedFiles([])
+      setFiles([])
     }
   }
 
   const handleLogout = () => {
-    localStorage.removeItem("iqac_user")
+    localStorage.removeItem("edutask_user")
     router.push("/login")
   }
 
@@ -116,7 +112,7 @@ export default function UploadPage() {
     }
   }
 
-  const handleDrag = (e: React.DragEvent) => {
+  const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
     if (e.type === "dragenter" || e.type === "dragover") {
@@ -124,35 +120,88 @@ export default function UploadPage() {
     } else if (e.type === "dragleave") {
       setDragActive(false)
     }
-  }
+  }, [])
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
-
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const files = Array.from(e.dataTransfer.files)
-      setSelectedFiles((prev) => [...prev, ...files])
+      setSelectedFiles(e.dataTransfer.files)
     }
-  }
+  }, [])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const files = Array.from(e.target.files)
-      setSelectedFiles((prev) => [...prev, ...files])
+      setSelectedFiles(e.target.files)
     }
   }
 
-  const removeFile = (index: number) => {
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+  const simulateUpload = async () => {
+    if (!selectedFiles || !user || !selectedCategory) return
+
+    setUploading(true)
+    setUploadProgress(0)
+
+    try {
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i]
+
+        // Simulate upload progress
+        for (let progress = 0; progress <= 100; progress += 10) {
+          setUploadProgress(progress)
+          await new Promise((resolve) => setTimeout(resolve, 100))
+        }
+
+        const fileData = {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          category: selectedCategory,
+          task_id: selectedTask || undefined,
+          uploaded_by: user.id,
+          url: `/placeholder.${file.name.split(".").pop()}`,
+        }
+
+        const uploadedFile = await uploadFile(fileData)
+        setFiles((prev) => [uploadedFile, ...prev])
+      }
+
+      // Reset form
+      setSelectedFiles(null)
+      setSelectedCategory("")
+      setSelectedTask("")
+      setUploadProgress(0)
+    } catch (error) {
+      console.error("Upload failed:", error)
+      alert("Upload failed. Please try again.")
+    } finally {
+      setUploading(false)
+    }
   }
 
-  const getFileIcon = (fileType: string) => {
-    if (fileType.startsWith("image/")) {
-      return <ImageIcon className="h-5 w-5 text-blue-500" />
+  const handleDeleteFile = async () => {
+    if (!fileToDelete) return
+
+    try {
+      await deleteFile(fileToDelete.id)
+      setFiles((prev) => prev.filter((file) => file.id !== fileToDelete.id))
+      setShowDeleteDialog(false)
+      setFileToDelete(null)
+    } catch (error) {
+      console.error("Failed to delete file:", error)
+      alert("Failed to delete file. Please try again.")
     }
-    return <FileText className="h-5 w-5 text-gray-500" />
+  }
+
+  const getFileIcon = (type: string) => {
+    if (type.startsWith("image/")) {
+      return <ImageIcon className="h-5 w-5 text-blue-600" />
+    } else if (type === "application/pdf") {
+      return <FileText className="h-5 w-5 text-red-600" />
+    } else {
+      return <File className="h-5 w-5 text-gray-600" />
+    }
   }
 
   const formatFileSize = (bytes: number) => {
@@ -163,101 +212,7 @@ export default function UploadPage() {
     return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
-  const validateFiles = (files: File[]) => {
-    const maxSize = 10 * 1024 * 1024 // 10MB
-    const allowedTypes = [
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-powerpoint",
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-    ]
-
-    for (const file of files) {
-      if (file.size > maxSize) {
-        throw new Error(`File ${file.name} is too large. Maximum size is 10MB.`)
-      }
-      if (!allowedTypes.includes(file.type)) {
-        throw new Error(`File type ${file.type} is not supported.`)
-      }
-    }
-  }
-
-  const handleUpload = async () => {
-    if (selectedFiles.length === 0) {
-      setAlert({ type: "error", message: "Please select at least one file to upload." })
-      return
-    }
-
-    if (!uploadTitle.trim()) {
-      setAlert({ type: "error", message: "Please provide a title for the upload." })
-      return
-    }
-
-    try {
-      validateFiles(selectedFiles)
-      setUploading(true)
-      setUploadProgress(0)
-
-      const uploadPromises = selectedFiles.map(async (file, index) => {
-        const result = await uploadFile(file, selectedTask || undefined, userData?.id, {
-          title: uploadTitle,
-          description: description || undefined,
-          category: category || undefined,
-        })
-
-        // Update progress
-        setUploadProgress(((index + 1) / selectedFiles.length) * 100)
-        return result
-      })
-
-      await Promise.all(uploadPromises)
-
-      // Refresh uploaded files list
-      await loadData()
-
-      // Reset form
-      setSelectedFiles([])
-      setUploadTitle("")
-      setDescription("")
-      setCategory("")
-      setSelectedTask("")
-      setUploadProgress(0)
-
-      setAlert({ type: "success", message: `Successfully uploaded ${selectedFiles.length} file(s).` })
-    } catch (error) {
-      console.error("Upload failed:", error)
-      setAlert({
-        type: "error",
-        message: error instanceof Error ? error.message : "Upload failed. Please try again.",
-      })
-    } finally {
-      setUploading(false)
-      setTimeout(() => setAlert(null), 5000)
-    }
-  }
-
-  const handleDeleteFile = async (fileId: string) => {
-    if (!confirm("Are you sure you want to delete this file?")) {
-      return
-    }
-
-    try {
-      await deleteFile(fileId)
-      setUploadedFiles((prev) => prev.filter((file) => file.id !== fileId))
-      setAlert({ type: "success", message: "File deleted successfully." })
-    } catch (error) {
-      console.error("Delete failed:", error)
-      setAlert({ type: "error", message: "Failed to delete file. Please try again." })
-    } finally {
-      setTimeout(() => setAlert(null), 3000)
-    }
-  }
+  const filteredTasks = user?.role === "staff" ? tasks.filter((task) => task.assigned_to === user.id) : tasks
 
   if (loading) {
     return (
@@ -270,7 +225,7 @@ export default function UploadPage() {
     )
   }
 
-  if (!userData) {
+  if (!user) {
     return null
   }
 
@@ -283,15 +238,15 @@ export default function UploadPage() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <TrendingUp className="h-8 w-8 text-blue-600" />
-                <h1 className="text-xl font-bold text-gray-900">IQAC SmartTrack</h1>
+                <h1 className="text-xl font-bold text-gray-900">EduTask</h1>
               </div>
             </div>
 
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                {getRoleIcon(userData.role)}
-                <span className="text-sm font-medium text-gray-700">{userData.name}</span>
-                <Badge className={getRoleColor(userData.role)}>{userData.role.toUpperCase()}</Badge>
+                {getRoleIcon(user.role)}
+                <span className="text-sm font-medium text-gray-700">{user.name}</span>
+                <Badge className={getRoleColor(user.role)}>{user.role.toUpperCase()}</Badge>
               </div>
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
@@ -316,7 +271,7 @@ export default function UploadPage() {
               href="/tasks"
               className="border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300"
             >
-              {userData.role === "staff" ? "My Tasks" : "All Tasks"}
+              {user.role === "staff" ? "My Tasks" : "All Tasks"}
             </Link>
             <Link
               href="/faculty"
@@ -340,39 +295,24 @@ export default function UploadPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload Files</h2>
-            <p className="text-gray-600">Upload task-related documents and files to the system.</p>
+          {/* Header */}
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">File Upload</h2>
+            <p className="text-gray-600">Upload and manage your task-related files</p>
           </div>
 
-          {/* Alert */}
-          {alert && (
-            <Alert
-              className={`mb-6 ${alert.type === "error" ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}`}
-            >
-              {alert.type === "error" ? (
-                <AlertCircle className="h-4 w-4 text-red-600" />
-              ) : (
-                <CheckCircle className="h-4 w-4 text-green-600" />
-              )}
-              <AlertDescription className={alert.type === "error" ? "text-red-800" : "text-green-800"}>
-                {alert.message}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Upload Form */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Upload Section */}
             <Card>
               <CardHeader>
-                <CardTitle>Upload New Files</CardTitle>
-                <CardDescription>Select files to upload and provide additional information.</CardDescription>
+                <CardTitle>Upload Files</CardTitle>
+                <CardDescription>Drag and drop files or click to select</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* File Upload Area */}
+              <CardContent className="space-y-4">
+                {/* Drag and Drop Area */}
                 <div
                   className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                    dragActive ? "border-blue-400 bg-blue-50" : "border-gray-300 hover:border-gray-400"
+                    dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-gray-400"
                   }`}
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
@@ -380,40 +320,42 @@ export default function UploadPage() {
                   onDrop={handleDrop}
                 >
                   <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg font-medium text-gray-900 mb-2">Drop files here or click to browse</p>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Supports PDF, DOC, XLS, PPT, and image files up to 10MB each
-                  </p>
+                  <div className="space-y-2">
+                    <p className="text-lg font-medium text-gray-900">Drop files here or click to upload</p>
+                    <p className="text-sm text-gray-500">Support for PDF, DOC, DOCX, JPG, PNG files up to 10MB</p>
+                  </div>
                   <input
                     type="file"
                     multiple
                     onChange={handleFileSelect}
-                    className="hidden"
-                    id="file-upload"
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                   />
-                  <Button asChild variant="outline">
-                    <label htmlFor="file-upload" className="cursor-pointer">
-                      Browse Files
-                    </label>
-                  </Button>
                 </div>
 
                 {/* Selected Files */}
-                {selectedFiles.length > 0 && (
+                {selectedFiles && selectedFiles.length > 0 && (
                   <div className="space-y-2">
                     <Label>Selected Files ({selectedFiles.length})</Label>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {selectedFiles.map((file, index) => (
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {Array.from(selectedFiles).map((file, index) => (
                         <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                           <div className="flex items-center space-x-2">
                             {getFileIcon(file.type)}
-                            <div>
-                              <p className="text-sm font-medium">{file.name}</p>
-                              <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
-                            </div>
+                            <span className="text-sm font-medium truncate">{file.name}</span>
+                            <span className="text-xs text-gray-500">({formatFileSize(file.size)})</span>
                           </div>
-                          <Button variant="ghost" size="sm" onClick={() => removeFile(index)}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const dt = new DataTransfer()
+                              Array.from(selectedFiles).forEach((f, i) => {
+                                if (i !== index) dt.items.add(f)
+                              })
+                              setSelectedFiles(dt.files.length > 0 ? dt.files : null)
+                            }}
+                          >
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
@@ -422,27 +364,32 @@ export default function UploadPage() {
                   </div>
                 )}
 
-                {/* Upload Details */}
+                {/* Upload Form */}
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="upload-title">Upload Title *</Label>
-                    <Input
-                      id="upload-title"
-                      value={uploadTitle}
-                      onChange={(e) => setUploadTitle(e.target.value)}
-                      placeholder="Enter a title for this upload"
-                      required
-                    />
+                    <Label htmlFor="category">Category *</Label>
+                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div>
-                    <Label htmlFor="task-select">Associated Task (Optional)</Label>
+                    <Label htmlFor="task">Associated Task (Optional)</Label>
                     <Select value={selectedTask} onValueChange={setSelectedTask}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a task (optional)" />
+                        <SelectValue placeholder="Select task" />
                       </SelectTrigger>
                       <SelectContent>
-                        {tasks.map((task) => (
+                        {filteredTasks.map((task) => (
                           <SelectItem key={task.id} value={task.id}>
                             {task.title}
                           </SelectItem>
@@ -451,122 +398,86 @@ export default function UploadPage() {
                     </Select>
                   </div>
 
-                  <div>
-                    <Label htmlFor="category">Category</Label>
-                    <Select value={category} onValueChange={setCategory}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Add a description for the uploaded files"
-                      rows={3}
-                    />
-                  </div>
-                </div>
-
-                {/* Upload Progress */}
-                {uploading && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Uploading files...</span>
-                      <span>{Math.round(uploadProgress)}%</span>
+                  {uploading && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Uploading...</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <Progress value={uploadProgress} />
                     </div>
-                    <Progress value={uploadProgress} />
-                  </div>
-                )}
+                  )}
 
-                {/* Upload Button */}
-                <Button
-                  onClick={handleUpload}
-                  disabled={selectedFiles.length === 0 || uploading || !uploadTitle.trim()}
-                  className="w-full"
-                >
-                  {uploading ? "Uploading..." : `Upload ${selectedFiles.length} File(s)`}
-                </Button>
+                  <Button
+                    onClick={simulateUpload}
+                    disabled={!selectedFiles || !selectedCategory || uploading}
+                    className="w-full"
+                  >
+                    {uploading ? "Uploading..." : "Upload Files"}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Previously Uploaded Files */}
+            {/* Recent Files */}
             <Card>
               <CardHeader>
-                <CardTitle>Previously Uploaded Files</CardTitle>
-                <CardDescription>View and manage your uploaded files.</CardDescription>
+                <CardTitle>Recent Files</CardTitle>
+                <CardDescription>Your recently uploaded files</CardDescription>
               </CardHeader>
               <CardContent>
-                {uploadedFiles.length === 0 ? (
+                {files.length === 0 ? (
                   <div className="text-center py-8">
-                    <File className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No files uploaded yet</h3>
-                    <p className="text-gray-500">Upload your first file using the form on the left.</p>
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No files uploaded</h3>
+                    <p className="text-gray-500">Upload your first file to get started.</p>
                   </div>
                 ) : (
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
-                    {uploadedFiles.map((file) => (
-                      <div key={file.id} className="border rounded-lg p-4 hover:bg-gray-50">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-3">
-                            {getFileIcon(file.file_type)}
-                            <div className="flex-1">
-                              <h4 className="font-medium text-gray-900">{file.upload_title || file.file_name}</h4>
-                              <p className="text-sm text-gray-500">{file.file_name}</p>
-                              <p className="text-xs text-gray-400">{formatFileSize(file.file_size)}</p>
-
-                              {file.category && (
-                                <Badge variant="outline" className="mt-1 text-xs">
-                                  {file.category}
-                                </Badge>
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {files.slice(0, 10).map((file) => (
+                      <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          {getFileIcon(file.type)}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                            <div className="flex items-center space-x-2 text-xs text-gray-500">
+                              <span>{formatFileSize(file.size)}</span>
+                              <span>•</span>
+                              <Badge variant="outline" className="text-xs">
+                                {file.category}
+                              </Badge>
+                              {file.uploaded_user && (
+                                <>
+                                  <span>•</span>
+                                  <span>{file.uploaded_user.name}</span>
+                                </>
                               )}
-
-                              {file.description && <p className="text-sm text-gray-600 mt-2">{file.description}</p>}
-
-                              <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                                {file.task && (
-                                  <div className="flex items-center">
-                                    <FileText className="h-3 w-3 mr-1" />
-                                    {file.task.title}
-                                  </div>
-                                )}
-                                <div className="flex items-center">
-                                  <User className="h-3 w-3 mr-1" />
-                                  {file.uploaded_user?.name || "Unknown"}
-                                </div>
-                                <div className="flex items-center">
-                                  <Calendar className="h-3 w-3 mr-1" />
-                                  {new Date(file.created_at).toLocaleDateString()}
-                                </div>
-                              </div>
                             </div>
                           </div>
-
-                          <div className="flex items-center space-x-2">
-                            <Button variant="outline" size="sm" onClick={() => window.open(file.file_url, "_blank")}>
-                              <Download className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteFile(file.id)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
                         </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Download className="h-4 w-4 mr-2" />
+                              Download
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setFileToDelete(file)
+                                setShowDeleteDialog(true)
+                              }}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     ))}
                   </div>
@@ -574,8 +485,84 @@ export default function UploadPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* All Files */}
+          {files.length > 0 && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>All Files ({files.length})</CardTitle>
+                <CardDescription>Complete list of uploaded files</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {files.map((file) => (
+                    <div
+                      key={file.id}
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                    >
+                      <div className="flex items-center space-x-4">
+                        {getFileIcon(file.type)}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                          <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
+                            <span>{formatFileSize(file.size)}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {file.category}
+                            </Badge>
+                            {file.uploaded_user && <span>Uploaded by: {file.uploaded_user.name}</span>}
+                            <span>{new Date(file.created_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setFileToDelete(file)
+                              setShowDeleteDialog(true)
+                            }}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </main>
+
+      {/* Delete Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete File</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{fileToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteFile} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
