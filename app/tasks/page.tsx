@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarDays, Plus, Search, TrendingUp, LogOut } from "lucide-react"
+import { CalendarDays, Search, TrendingUp, LogOut, Eye } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { NewTaskDialog } from "@/components/new-task-dialog"
+import { EditTaskDialog } from "@/components/edit-task-dialog"
 
 interface User {
   email: string
@@ -16,11 +18,24 @@ interface User {
   name: string
 }
 
+interface Task {
+  id: number
+  title: string
+  description: string
+  faculty: string
+  department: string
+  dueDate: string
+  status: string
+  priority: string
+  createdDate: string
+}
+
 export default function TasksPage() {
   const [user, setUser] = useState<User | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [priorityFilter, setPriorityFilter] = useState("all")
+  const [tasks, setTasks] = useState<Task[]>([])
   const router = useRouter()
 
   useEffect(() => {
@@ -30,6 +45,66 @@ export default function TasksPage() {
     } else {
       setUser(JSON.parse(userData))
     }
+
+    // Initialize tasks
+    const initialTasks = [
+      {
+        id: 1,
+        title: "Submit Course Outcome Assessment",
+        description: "Complete assessment for all courses taught in the current semester",
+        faculty: "Dr. Sarah Johnson",
+        department: "Computer Science",
+        dueDate: "2024-01-15",
+        status: "pending",
+        priority: "high",
+        createdDate: "2024-01-01",
+      },
+      {
+        id: 2,
+        title: "Update Curriculum Mapping",
+        description: "Map curriculum to program outcomes and course objectives",
+        faculty: "Prof. Michael Chen",
+        department: "Electronics",
+        dueDate: "2024-01-18",
+        status: "in-progress",
+        priority: "medium",
+        createdDate: "2024-01-02",
+      },
+      {
+        id: 3,
+        title: "Prepare NAAC Documentation",
+        description: "Compile all required documents for NAAC accreditation",
+        faculty: "Dr. Emily Davis",
+        department: "Mathematics",
+        dueDate: "2024-01-20",
+        status: "completed",
+        priority: "high",
+        createdDate: "2024-01-03",
+      },
+      {
+        id: 4,
+        title: "Faculty Development Program Report",
+        description: "Submit report on attended faculty development programs",
+        faculty: "Prof. Robert Wilson",
+        department: "Physics",
+        dueDate: "2024-01-22",
+        status: "pending",
+        priority: "low",
+        createdDate: "2024-01-04",
+      },
+      {
+        id: 5,
+        title: "Research Publication Summary",
+        description: "Provide summary of research publications for the academic year",
+        faculty: "Dr. Lisa Anderson",
+        department: "Chemistry",
+        dueDate: "2024-01-25",
+        status: "in-progress",
+        priority: "medium",
+        createdDate: "2024-01-05",
+      },
+    ]
+    setTasks(initialTasks)
   }, [router])
 
   const handleLogout = () => {
@@ -37,63 +112,13 @@ export default function TasksPage() {
     router.push("/login")
   }
 
-  const tasks = [
-    {
-      id: 1,
-      title: "Submit Course Outcome Assessment",
-      description: "Complete assessment for all courses taught in the current semester",
-      faculty: "Dr. Sarah Johnson",
-      department: "Computer Science",
-      dueDate: "2024-01-15",
-      status: "pending",
-      priority: "high",
-      createdDate: "2024-01-01",
-    },
-    {
-      id: 2,
-      title: "Update Curriculum Mapping",
-      description: "Map curriculum to program outcomes and course objectives",
-      faculty: "Prof. Michael Chen",
-      department: "Electronics",
-      dueDate: "2024-01-18",
-      status: "in-progress",
-      priority: "medium",
-      createdDate: "2024-01-02",
-    },
-    {
-      id: 3,
-      title: "Prepare NAAC Documentation",
-      description: "Compile all required documents for NAAC accreditation",
-      faculty: "Dr. Emily Davis",
-      department: "Mathematics",
-      dueDate: "2024-01-20",
-      status: "completed",
-      priority: "high",
-      createdDate: "2024-01-03",
-    },
-    {
-      id: 4,
-      title: "Faculty Development Program Report",
-      description: "Submit report on attended faculty development programs",
-      faculty: "Prof. Robert Wilson",
-      department: "Physics",
-      dueDate: "2024-01-22",
-      status: "pending",
-      priority: "low",
-      createdDate: "2024-01-04",
-    },
-    {
-      id: 5,
-      title: "Research Publication Summary",
-      description: "Provide summary of research publications for the academic year",
-      faculty: "Dr. Lisa Anderson",
-      department: "Chemistry",
-      dueDate: "2024-01-25",
-      status: "in-progress",
-      priority: "medium",
-      createdDate: "2024-01-05",
-    },
-  ]
+  const handleTaskCreate = (newTask: Task) => {
+    setTasks((prev) => [newTask, ...prev])
+  }
+
+  const handleTaskUpdate = (updatedTask: Task) => {
+    setTasks((prev) => prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)))
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -179,10 +204,7 @@ export default function TasksPage() {
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
               </Button>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New Task
-              </Button>
+              <NewTaskDialog onTaskCreate={handleTaskCreate} />
             </div>
           </div>
         </div>
@@ -271,9 +293,10 @@ export default function TasksPage() {
                 </div>
                 <div className="flex justify-end mt-4 space-x-2">
                   <Button variant="outline" size="sm">
+                    <Eye className="h-4 w-4 mr-2" />
                     View Details
                   </Button>
-                  <Button size="sm">Edit Task</Button>
+                  <EditTaskDialog task={task} onTaskUpdate={handleTaskUpdate} />
                 </div>
               </CardContent>
             </Card>
@@ -284,10 +307,9 @@ export default function TasksPage() {
           <Card>
             <CardContent className="p-12 text-center">
               <p className="text-gray-500 text-lg">No tasks found matching your criteria.</p>
-              <Button className="mt-4">
-                <Plus className="h-4 w-4 mr-2" />
-                Create New Task
-              </Button>
+              <div className="mt-4">
+                <NewTaskDialog onTaskCreate={handleTaskCreate} />
+              </div>
             </CardContent>
           </Card>
         )}
